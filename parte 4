@@ -1,0 +1,398 @@
+//LEDS DE LOS DISPLAYS
+#define A 13
+#define B 12
+#define C 11
+#define D 10
+#define E 9
+#define F 8
+#define G 7
+
+//PULSADORES
+#define RESET 5
+#define AUM 3
+#define DISM 1
+
+//CONTROL DE LOS DISPLAY
+#define DECENA A4
+#define UNIDAD A5
+
+//ESTADO APAGADO PARA LOS DISPLAYS
+#define APAGADOS 0
+
+//DILEY DISPLAY ENCENDIDO
+#define TIMEDISPLAYON 10
+
+//INTERRUPTOR
+#define INTERRUPTOR 6
+
+//MOTOR
+#define MOTOR 2
+
+//SENSOR
+#define SENSOR A0
+
+//FOTODIODO
+#define FOTODIODO A2
+
+//VARIABLES GLOBALES
+int lecturaSensor;
+int lecturaFotodiodo;
+int temperatura;
+int luz;
+int TEMPERATURAMINIMA = 60;
+int TEMPERATURAMAXIMA = 80;
+int LUZMINIMA = 60;
+int LUZMAXIMA = 100;
+int contador = 0;
+
+//CONTROL DE PULSADORES
+int aum = 1;
+int aumPrevia = 1;
+int dism = 1;
+int dismPrevia = 1;
+int reset = 1;
+int resetPrevia = 1;
+int estadoSwitchPrevia = 1;
+
+void setup()
+{  
+  pinMode(RESET, INPUT_PULLUP);
+  pinMode(AUM, INPUT_PULLUP);
+  pinMode(DISM, INPUT_PULLUP);
+  pinMode(INTERRUPTOR, INPUT_PULLUP);
+  pinMode(DECENA, OUTPUT);
+  pinMode(UNIDAD, OUTPUT);
+  pinMode(MOTOR, OUTPUT);
+    
+  for (int i = G; i <= A; i++)
+  {
+    pinMode(i, OUTPUT);
+  }
+  
+  //INICIALIZO LOS DISPLAYS EN "APAGADOS"
+  prenderDisplay(APAGADOS);
+    
+  Serial.begin(9600); 
+}
+
+void loop()
+{
+  //EMPIEZO HACIENDO LAS LECTURAS DE MI SENSOR Y MI FOTODIODO
+  lecturaFotodiodo = analogRead(FOTODIODO);
+  lecturaSensor = analogRead(SENSOR);
+  
+  //PREGUNTO EL MOTOR SE ENCENDIÓ
+  if (habilitarProyecto(lecturaSensor, lecturaFotodiodo))
+  { 
+    //PREGUNTO EL ESTADO DE MI INTERRUPTOR
+    int estadoInterruptor = digitalRead(INTERRUPTOR);
+    //VERIFICO SI ALGUN PULSADOR FUÉ PULSADO
+    controlarMotor(estadoInterruptor);
+    int pulsador = verificarPulsadores();
+    
+    //EN CUALQUIERA DE LOS ESTADOS DEL INTERRUPTOR, SI SE PULSO "RESET" EL CONTADOR SIEMPRE SE REINICIARA A 0
+    if (pulsador == RESET)
+    {
+      contador = 0;
+    }
+    //SI NO SE PRESIONO RESET Y EL INTERRUPTOR TAMPOCO FUE PULSADO LOS PULSADORES AUMENTARAN Y DISMINUIRAN DE A UN DIGITO
+    else if (!controlarInterruptor(estadoInterruptor))
+    {      
+      controlarPulsadoresInterruptorApagado(pulsador);
+    }
+    //SI NO SE PRESIONO RESET Y EL INTERRUPTOR FUE PULSADO LOS PULSADORES AUMENTARAN Y DISMINUIRAN DE UN NUMERO PRIMO A OTRO
+    else
+    {
+      controlarPulsadoresInterruptorEncendido(pulsador);
+    }
+    //SE DIBUJA EL CONTADOR EN LOS DISPLAYS
+    dibujarContador(contador);    
+  }
+  
+  else 
+  {
+    prenderDisplay(APAGADOS);
+  	contador = 0;
+  }
+  delay(25);
+}
+
+bool controlarInterruptor(int estadoInterruptor)
+{
+  /*Esta función devuelve TRUE si el interruptor fue pulsado y FALSE en el caso contrario, 
+  además, se encarga de resetear el contador a 0 si el interruptor cambió su estado*/
+  
+  bool prendido = false;
+  
+  if(estadoInterruptor == 0)
+  {
+     prendido = true;
+  }
+
+  if(estadoInterruptor == !estadoSwitchPrevia)
+  {
+    estadoSwitchPrevia = estadoInterruptor;
+    contador = 0;
+  }
+  return prendido;
+}
+
+bool habilitarProyecto(int lecturaSensor, int lecturaFotodiodo)
+{
+  /*Esta función devuelve TRUE si el motor está encendido y FALSE en el caso contrario.
+  	Controla el encendido del motor dependiendo de si las lecturas del sensor de temperatura 
+    y del fotodiodo están dentro del rango esperado.*/
+  bool habilitado;
+  
+    temperatura = map(lecturaSensor, 20, 358, -40, 125);
+    luz = map (lecturaFotodiodo, 0, 1023, 0, 100);
+  
+    if (temperatura >= TEMPERATURAMINIMA && temperatura <= TEMPERATURAMAXIMA && luz >= LUZMINIMA && luz <= LUZMAXIMA)
+    {
+      habilitado = true;
+    }
+    else
+    {      
+      habilitado = false;
+    }
+    return habilitado;
+}
+
+void controlarMotor(int estadoInterruptor)
+  {	   
+    if (estadoInterruptor == 1)
+    {
+      digitalWrite(MOTOR, HIGH);
+    }
+    else
+    {
+      digitalWrite(MOTOR, LOW); 
+    }
+  }
+
+void controlarPulsadoresInterruptorApagado(int pulsador)
+{
+  /*Esta función se encarga de la lógica de los pulsadores
+  en el caso de que el interruptor se encuentre apagado,
+  dependiendo de si el pulsador es AUM o DISM aumenta y disminuye
+  el contador en un digito, si este supera el número 99 se reiniciará
+  a 0, si este baja del 0 se establecerá en 99*/
+  //Serial.println(pulsador);
+  if (pulsador == AUM)
+  { 
+    contador++;
+    if (contador > 99)
+      contador = 0;
+  }
+  else if (pulsador == DISM)
+  {
+    contador--;
+    if (contador < 0)
+      contador = 99;
+  }
+}
+
+void controlarPulsadoresInterruptorEncendido(int pulsador)
+{
+  /*Esta función se encarga de la lógica de los pulsadores
+  en el caso de que el interruptor se encuentre encendido,
+  dependiendo de si el pulsador es AUM o DISM aumenta y disminuye
+  el contador de un número primo al siguiente más cercano, si este 
+  último supera al 99 buscara el siguiente num primo mas cercano a 0, 
+  si este baja de 2 buscara el num primo mas cercano al 99*/
+  
+  if(pulsador == AUM)
+  {
+    contador ++;
+    contador = buscarNumeroPrimoPosterior(contador);
+    if(contador >=99)
+    {
+      contador = buscarNumeroPrimoPosterior(0);
+    }
+  }
+  else if (pulsador == DISM)
+  {
+    contador --;
+    contador = buscarNumeroPrimoAnterior(contador);
+    if(contador == 99)
+    {
+      contador = buscarNumeroPrimoAnterior(contador);
+    }
+  }
+}
+
+int buscarNumeroPrimoPosterior(int numeroActual)
+{
+  /*Esta función devuelve el numero primo posterior más
+  cercano al número pasado por parametro*/
+  for (numeroActual; ;numeroActual++)
+  {
+    if(esPrimo(numeroActual))
+    {        
+      break;
+    }
+  }
+  return numeroActual;
+}
+
+int buscarNumeroPrimoAnterior(int numeroActual)
+{
+  /*Esta función devuelve el numero primo anterior más
+  cercano al número pasado por parametro*/
+  for (numeroActual; numeroActual > 1; numeroActual--)
+  {
+    if(esPrimo(numeroActual))
+    {
+      break;
+    }
+  }
+  if(numeroActual <= 1)
+  {
+    numeroActual = 99;
+  }
+  return numeroActual;
+}
+
+void dibujarNumero(int numero)
+{
+  /*Esta función dibuja el número pasado por parametro
+  en los displays que estén encendidos*/
+  switch (numero)
+  {
+    case 0:
+    ConfigurarDisplay(1, 1, 1, 1, 1, 1, 0);
+    break;
+    case 1:
+    ConfigurarDisplay(0, 1, 1, 0, 0, 0, 0);
+    break;
+    case 2:
+    ConfigurarDisplay(1, 1, 0, 1, 1, 0, 1);
+    break;
+    case 3:
+    ConfigurarDisplay(1, 1, 1, 1, 0, 0, 1);
+    break;
+    case 4:
+    ConfigurarDisplay(0, 1, 1, 0, 0, 1, 1);
+    break;
+    case 5:
+    ConfigurarDisplay(1, 0, 1, 1, 0, 1, 1);
+    break;
+    case 6:
+    ConfigurarDisplay(1, 0, 1, 1, 1, 1, 1);
+    break;
+    case 7:
+    ConfigurarDisplay(1, 1, 1, 0, 0, 0, 0);
+    break;
+    case 8:
+    ConfigurarDisplay(1, 1, 1, 1, 1, 1, 1);
+    break;
+    case 9:
+    ConfigurarDisplay(1, 1, 1, 0, 0, 1, 1);
+  }
+}
+
+void ConfigurarDisplay(int a, int b, int c, int d, int e, int f, int g)
+{
+  /*Esta función enciende y apaga los leds de los displays segun los
+  parametros pasados, sirve para dibujar un número*/
+  digitalWrite(A, a);
+  digitalWrite(B, b);
+  digitalWrite(C, c);
+  digitalWrite(D, d);
+  digitalWrite(E, e);
+  digitalWrite(F, f);
+  digitalWrite(G, g);
+}
+
+void prenderDisplay(int digito)
+{
+  /*Esta función enciende el display pasado por parametro
+  y tambien los apaga, sirve para controlar que display
+  será utilizado para dibujar un número, si el de las unidades o el de las decenas*/
+  if (digito == UNIDAD)
+  {
+    digitalWrite(UNIDAD, 0);
+    digitalWrite(DECENA, 1);
+    delay(TIMEDISPLAYON);
+  }
+  else if (digito == DECENA)
+  {
+    digitalWrite(UNIDAD, 1);
+    digitalWrite(DECENA, 0);
+    delay(TIMEDISPLAYON);
+  }
+  else
+  {
+    digitalWrite(UNIDAD, 1);
+    digitalWrite(DECENA, 1);
+  }
+}
+
+void dibujarContador(int contador)
+{
+  //APAGO LOS DISPLAYS PARA TENER CONTROL DE CADA UNO
+  prenderDisplay(APAGADOS);
+  //PRIMERO DIBUJO LAS DECENAS
+  dibujarNumero((int)contador / 10);
+  //PRENDO EL DISPLAY DE LAS DECENAS
+  prenderDisplay(DECENA);
+  //LOS VUELVO A APAGAR PARA YA NO TOCAR EL DISPLAY DE LAS DECENAS
+  prenderDisplay(APAGADOS);
+  //LUEGO DIBUJO LAS UNIDADES
+  dibujarNumero(contador - 10 * ((int)contador / 10));
+  //PRENDO EL DISPLAY DE LAS UNIDADES
+  prenderDisplay(UNIDAD);
+}
+
+int verificarPulsadores()
+{
+  /*Esta funcion devuelve el boton que fue presionado o 0 en el caso de que ninguno haya sido presionado*/
+  aum = digitalRead(AUM); // Al ser declarado input_pullup devuelve 0 SI SE PRESIONÓ, 1 SI NO SE PRESIONÓ
+  dism = digitalRead(DISM);
+  reset = digitalRead(RESET);
+  // COMPRUEBO SI LOS PULSADORES ESTÁN SIN PRESIONAR
+  if (aum == 1)
+    aumPrevia = 1; //EL ESTADO ANTERIOR DEL PULSADOR ES SIN PRESIONAR
+  if (dism == 1)
+    dismPrevia = 1;
+  if (reset == 1)
+    resetPrevia = 1;
+  // COMPRUEBO SI EL PULSADOR PRESIONADO ESTABA "SIN PRESIONAR"
+  if (aum == 0 && aum != aumPrevia)
+  {
+    aumPrevia = 0; //EL ESTADO ANTERIOR DEL PULSADOR AHORA ES PRESIONADO
+    return AUM;
+  }
+  if (dism == 0 && dism != dismPrevia)
+  {
+    dismPrevia = 0;
+    return DISM;
+  }
+  if (reset == 0 && reset != resetPrevia)
+  {
+    resetPrevia = 0;
+    return RESET;
+  }
+  return 0; //NO SE PRESIONÓ NINGÚN BOTÓN O SE MANTUVO PRESIONADO EL MISMO
+}
+
+bool esPrimo(int numero)
+{
+  /*Esta funcion devuelve TRUE si un numero es primo y FALSE si no lo es*/
+  bool esPrimo = true;
+  if (numero < 2)
+  {
+    esPrimo = false; // Los números negativos y 1 no son primos
+  }
+
+  for (int i = 2; i <= sqrt(numero); i++)
+  {
+    if (numero % i == 0)
+    {
+      esPrimo = false; // Si el número tambien es divisible por i, no es primo
+      break;
+    }
+  }
+  return esPrimo;
+}
+
