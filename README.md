@@ -1,0 +1,2 @@
+# PRIMER-PARCIAL-SPD
+Primer parcial SPD 2023
