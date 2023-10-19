@@ -1,0 +1,186 @@
+// C++ code
+//DEFINO LOS LEDS DE LOS DISPLAYS
+#define A 13
+#define B 12
+#define C 11
+#define D 10
+#define E 9
+#define F 8
+#define G 7
+//DEFINO LOS PULSADORES
+#define RESET 5
+#define AUM 3
+#define DISM 1
+//DEFINO CADA DISPLAY
+#define DECENA A4
+#define UNIDAD A5
+//DEFINO EL ESTADO APAGADO PARA LOS DISPLAYS
+#define APAGADOS 0
+//DEFINO EL TIEMPO QUE VOY A MANTENER PRENDIDO UN DISPLAY
+#define TIMEDISPLAYON 10
+//EL contador define que numero va a mostrarse en los displays
+int contador = 0;
+//Estas variables sirven para controlar los pulsadores
+int aum = 1;
+int aumPrevia = 1;
+int dism = 1;
+int dismPrevia = 1;
+int reset = 1;
+int resetPrevia = 1;
+
+void setup()
+{
+  pinMode(RESET, INPUT_PULLUP);
+  pinMode(AUM, INPUT_PULLUP);
+  pinMode(DISM, INPUT_PULLUP);
+  pinMode(DECENA, OUTPUT);
+  pinMode(UNIDAD, OUTPUT);
+  //INICIALIZO LOS DISPLAYS EN "APAGADOS"
+  digitalWrite(DECENA,0);
+  digitalWrite(UNIDAD,0);
+  
+  for(int i = G; i<= A; i++)
+  {
+    pinMode(i, OUTPUT);
+  }
+}
+
+void loop()
+{
+  int pulsador = verificarPulsadores();
+  if(pulsador == AUM)
+  {
+    contador++;
+    if(contador >99)
+    contador = 0;
+  }
+  else if (pulsador == DISM)
+  {
+    contador--;
+    if(contador < 0)
+    contador = 99;
+  }
+  else if (pulsador == RESET)
+  {
+    contador = 0;
+  }
+  dibujarContador(contador); 
+  delay(25);
+  }
+
+  
+void dibujarNumero(int numero)
+{
+  switch(numero)
+  {
+    case 0:
+    ConfigurarDisplay(1,1,1,1,1,1,0);    
+    break;
+    case 1:
+    ConfigurarDisplay(0,1,1,0,0,0,0);       
+    break;
+    case 2:
+    ConfigurarDisplay(1,1,0,1,1,0,1);    
+    break;
+    case 3:
+    ConfigurarDisplay(1,1,1,1,0,0,1);  
+    break;
+    case 4:
+    ConfigurarDisplay(0,1,1,0,0,1,1);    
+    break;
+    case 5:   
+    ConfigurarDisplay(1,0,1,1,0,1,1);        
+    break;
+    case 6: 
+    ConfigurarDisplay(1,0,1,1,1,1,1);         
+    break;
+    case 7: 
+    ConfigurarDisplay(1,1,1,0,0,0,0);       
+    break;
+    case 8:
+    ConfigurarDisplay(1,1,1,1,1,1,1);   
+    break;
+    case 9:    
+    ConfigurarDisplay(1,1,1,0,0,1,1);     
+  }  
+}
+
+void ConfigurarDisplay(int a, int b, int c, int d, int e, int f, int g)
+{
+  digitalWrite(A,a);
+  digitalWrite(B,b);
+  digitalWrite(C,c);
+  digitalWrite(D,d);
+  digitalWrite(E,e);
+  digitalWrite(F,f);
+  digitalWrite(G,g);  
+}
+
+
+void prenderDisplay(int digito)
+{
+  if(digito == UNIDAD)
+  {
+    digitalWrite(UNIDAD, 0);
+    digitalWrite(DECENA, 1);
+    delay(TIMEDISPLAYON);
+  }
+  else if(digito == DECENA)
+  {
+    digitalWrite(UNIDAD, 1);
+    digitalWrite(DECENA, 0);
+    delay(TIMEDISPLAYON);
+  }
+  else
+  {
+    digitalWrite(UNIDAD, 1);     
+    digitalWrite(DECENA, 1);     
+  }
+}
+
+void dibujarContador(int contador)
+{
+  //APAGO LOS DISPLAYS PARA TENER CONTROL DE CADA UNO
+  prenderDisplay(APAGADOS);
+  //PRIMERO DIBUJO LAS DECENAS
+  dibujarNumero((int)contador/10);
+  //PRENDO EL DISPLAY DE LAS DECENAS
+  prenderDisplay(DECENA);
+  //LOS VUELVO A APAGAR PARA YA NO TOCAR EL DISPLAY DE LAS DECENAS
+  prenderDisplay(APAGADOS);
+  //LUEGO DIBUJO LAS UNIDADES
+  dibujarNumero(contador - 10 * ((int)contador/10));
+  //PRENDO EL DISPLAY DE LAS UNIDADES
+  prenderDisplay(UNIDAD);
+}
+
+int verificarPulsadores()
+{
+  aum = digitalRead(AUM); // DEVUELVE 0 SI SE PRESIONÓ, 1 SI NO SE PRESIONÓ
+  dism = digitalRead(DISM);
+  reset = digitalRead(RESET);
+  // COMPRUEBO SI LOS PULSADORES ESTAN SIN PRESIONAR
+  if (aum == 1) 
+    aumPrevia = 1; //EL ESTADO ANTERIOR DEL PULSADOR ES SIN PRESIONAR
+  if (dism == 1)
+    dismPrevia = 1;
+  if (reset == 1)
+    resetPrevia = 1;
+  // COMPRUEBO SI EL PULSADOR PRESIONADO ESTABA "SIN PRESIONAR"
+  if(aum ==0 && aum != aumPrevia)
+  {
+    aumPrevia = 0; //EL ESTADO ANTERIOR DEL PULSADOR AHORA ES PRESIONADO
+	return AUM; 
+  }
+  if(dism ==0 && dism != dismPrevia)
+  {
+    dismPrevia = 0;
+	return DISM; 
+  }
+  if(reset ==0 && reset != resetPrevia)
+  {
+    resetPrevia = 0;
+	return RESET; 
+  }
+  return 0; //NO SE PRESIONÓ NINGUN BOTON O SE MANTUVO PRESIONADO EL MISMO
+}
